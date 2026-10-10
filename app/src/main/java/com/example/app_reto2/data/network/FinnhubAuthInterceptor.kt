@@ -6,13 +6,10 @@ import okhttp3.Response
 class FinnhubAuthInterceptor(private val apiKey: String) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder()
-            .header(TOKEN_HEADER, apiKey)
+        val original = chain.request()
+        val url = original.url.newBuilder()
+            .addQueryParameter("token", apiKey)
             .build()
-        return chain.proceed(request)
-    }
-
-    companion object {
-        const val TOKEN_HEADER = "X-Finnhub-Token"
+        return chain.proceed(original.newBuilder().url(url).build())
     }
 }

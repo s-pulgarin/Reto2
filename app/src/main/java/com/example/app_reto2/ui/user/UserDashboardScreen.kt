@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.app_reto2.data.model.TransactionType
+import androidx.compose.ui.text.style.TextAlign
 
 private val AmountRegex = Regex("^\\d*\\.?\\d*$")
 
@@ -91,16 +92,20 @@ private fun UserDashboardContent(
                     CircularProgressIndicator(modifier = Modifier.size(40.dp))
                 } else {
                     Text(
-                        text = state.price?.let { "%.4f".format(it) } ?: "--",
+                        text = state.price?.let { "%.5f".format(it) } ?: "--",
                         style = MaterialTheme.typography.displaySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                TextButton(
-                    onClick = onRefresh,
-                    enabled = !state.isLoadingPrice && !state.isSavingTrade
-                ) {
-                    Text("Actualizar precio")
+                state.statusMessage?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                TextButton(onClick = onRefresh, enabled = !state.isSavingTrade) {
+                    Text("Reconectar")
                 }
             }
         }

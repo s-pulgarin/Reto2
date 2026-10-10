@@ -1,55 +1,37 @@
 package com.example.app_reto2.data.repository
 
 import com.example.app_reto2.BuildConfig
-import com.example.app_reto2.data.model.ForexRate
-import com.example.app_reto2.data.network.FinnhubClient
-import com.example.app_reto2.data.network.FinnhubService
+import com.example.app_reto2.data.network.FinnhubSocketException
+import com.example.app_reto2.data.network.FinnhubWebSocket
 import com.example.app_reto2.util.Resource
-import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.SerializationException
-import retrofit2.HttpException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import java.io.IOException
 
 class FinnhubRepositoryImpl(
-    private val service: FinnhubService = FinnhubClient.service
+    private val webSocket: FinnhubWebSocket = FinnhubWebSocket()
 ) : FinnhubRepository {
 
-    override suspend fun getRates(base: String): Resource<Map<String, Double>> =
-        safeApiCall {
-            service.getForexRates(base.trim().uppercase()).quote
-        }
-
-    override suspend fun getRate(base: String, quote: String): Resource<ForexRate> =
-        safeApiCall {
-            val from = base.trim().uppercase()
-            val to = quote.trim().uppercase()
-            val rate = service.getForexRates(from).quote[to]
-                ?: throw NoSuchElementException("El par $from/$to no está disponible.")
-            ForexRate(base = from, quote = to, rate = rate)
-        }
-
-    private suspend fun <T> safeApiCall(block: suspend () -> T): Resource<T> {
+    override fun observePrice(symbol: String): Flow<Resource<Double>> {
         if (BuildConfig.FINNHUB_API_KEY.isBlank()) {
-            return Resource.Error("Falta FINNHUB_API_KEY en local.properties.")
+            return flowOf(Resource.Error("Falta FINNHUB_API_KEY en local.properties."))
         }
-        return try {
-            Resource.Success(block())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: HttpException) {
-            Resource.Error(e.toFriendlyMessage(), e)
-        } catch (e: IOException) {
-            Resource.Error("Sin conexión. Revisa tu internet.", e)
-        } catch (e: SerializationException) {
-            Resource.Error("Respuesta inválida del servidor.", e)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Ocurrió un error inesperado.", e)
-        }
+        return webSocket.observePrice(symbol)
+            .conflate()
+            .map<Double, Resource<Double>> { Resource.Success(it) }
+            .catch { emit(Resource.Error(it.toFriendlyMessage(), it)) }
     }
 
-    private fun HttpException.toFriendlyMessage(): String = when (code()) {
-        401, 403 -> "API Key de Finnhub inválida o sin permisos."
-        429 -> "Límite de peticiones alcanzado. Intenta en un minuto."
-        else -> "Error del servidor (${code()})."
+    private fun Throwable.toFriendlyMessage(): String = when {
+        this is FinnhubSocketException -> when (httpCode) {
+            401, 403 -> "API Key de Finnhub inválida o sin acceso al WebSocket."
+            429 -> "Límite de conexiones alcanzado. Intenta en un minuto."
+            else -> "Se perdió la conexión de precios. Toca Reconectar."
+        }
+        this is IOException -> "Sin conexión. Revisa tu internet."
+        else -> "Error en la conexión de precios."
     }
 }

@@ -84,8 +84,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Red
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.kotlinx.serialization)
-    implementation(libs.okhttp.logging.interceptor)
+    implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 }

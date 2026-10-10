@@ -9,6 +9,8 @@ import com.example.app_reto2.data.repository.FinnhubRepository
 import com.example.app_reto2.data.repository.TransactionRepository
 import com.example.app_reto2.util.Resource
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,7 @@ data class UserDashboardState(
     val price: Double? = null,
     val isLoadingPrice: Boolean = true,
     val isSavingTrade: Boolean = false,
+    val statusMessage: String? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null
 )
@@ -30,22 +33,46 @@ class UserDashboardViewModel(
     private val userIdProvider: () -> String? = { FirebaseAuth.getInstance().uid }
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(UserDashboardState(currencyPair = BASE + QUOTE))
+    private val _state = MutableStateFlow(UserDashboardState(currencyPair = CURRENCY_PAIR))
     val state: StateFlow<UserDashboardState> = _state.asStateFlow()
+
+    private var priceJob: Job? = null
 
     init {
         loadPrice()
     }
 
+    /** Abre (o reabre) la conexión de precios en tiempo real. */
     fun loadPrice() {
-        _state.update { it.copy(isLoadingPrice = true, errorMessage = null, successMessage = null) }
-        viewModelScope.launch {
-            when (val result = finnhubRepository.getRate(BASE, QUOTE)) {
-                is Resource.Success -> _state.update {
-                    it.copy(price = result.data.rate, isLoadingPrice = false)
-                }
-                is Resource.Error -> _state.update {
-                    it.copy(isLoadingPrice = false, errorMessage = result.message)
+        priceJob?.cancel()
+        _state.update {
+            it.copy(
+                price = null,
+                isLoadingPrice = true,
+                statusMessage = null,
+                errorMessage = null,
+                successMessage = null
+            )
+        }
+        priceJob = viewModelScope.launch {
+            val waitNotice = launch {
+                delay(NO_TICK_NOTICE_MS)
+                _state.update { it.copy(statusMessage = NO_TICK_MESSAGE) }
+            }
+            finnhubRepository.observePrice(SYMBOL).collect { result ->
+                waitNotice.cancel()
+                when (result) {
+                    is Resource.Success -> _state.update {
+                        it.copy(price = result.data, isLoadingPrice = false, statusMessage = null)
+                    }
+                    is Resource.Error -> _state.update {
+                        it.copy(
+                            price = null,
+                            isLoadingPrice = false,
+                            statusMessage = null,
+                            errorMessage = result.message
+                        )
+                    }
                 }
             }
         }
@@ -93,7 +120,10 @@ class UserDashboardViewModel(
     }
 
     private companion object {
-        const val BASE = "USD"
-        const val QUOTE = "EUR"
+        const val SYMBOL = "BINANCE:BTCUSDT"
+        const val CURRENCY_PAIR = "BTCUSDT"
+        const val NO_TICK_NOTICE_MS = 8_000L
+        const val NO_TICK_MESSAGE =
+            "Esperando cotizaciones… Si el mercado forex está cerrado (viernes en la tarde a domingo), no habrá precios hasta que abra."
     }
 }
