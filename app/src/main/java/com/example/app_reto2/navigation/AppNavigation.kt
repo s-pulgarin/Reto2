@@ -10,7 +10,9 @@ import com.example.app_reto2.data.model.User
 import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.data.repository.AuthRepositoryImpl
 import com.example.app_reto2.data.repository.FinnhubRepositoryImpl
+import com.example.app_reto2.data.repository.KycRepositoryImpl
 import com.example.app_reto2.data.repository.TransactionRepositoryImpl
+import com.example.app_reto2.data.repository.UserRepositoryImpl
 import com.example.app_reto2.ui.admin.AdminDashboardScreen
 import com.example.app_reto2.ui.admin.AdminDashboardViewModel
 import com.example.app_reto2.ui.admin.AdminDashboardViewModelFactory
@@ -18,6 +20,9 @@ import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.AuthViewModelFactory
 import com.example.app_reto2.ui.auth.screens.LoginScreen
 import com.example.app_reto2.ui.auth.screens.RegisterScreen
+import com.example.app_reto2.ui.kyc.KycScreen
+import com.example.app_reto2.ui.kyc.KycViewModel
+import com.example.app_reto2.ui.kyc.KycViewModelFactory
 import com.example.app_reto2.ui.user.UserDashboardScreen
 import com.example.app_reto2.ui.user.UserDashboardViewModel
 import com.example.app_reto2.ui.user.UserDashboardViewModelFactory
@@ -69,7 +74,24 @@ fun AppNavigation() {
                     )
                 }
             )
-            UserDashboardScreen(viewModel = userDashboardViewModel)
+            UserDashboardScreen(
+                viewModel = userDashboardViewModel,
+                onNavigateToKyc = { navController.navigate(Screen.Kyc.route) }
+            )
+        }
+        composable(Screen.Kyc.route) {
+            val kycViewModel: KycViewModel = viewModel(
+                factory = remember {
+                    KycViewModelFactory(
+                        kycRepository = KycRepositoryImpl(),
+                        userRepository = UserRepositoryImpl()
+                    )
+                }
+            )
+            KycScreen(
+                viewModel = kycViewModel,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(Screen.AdminDashboard.route) {
             val adminDashboardViewModel: AdminDashboardViewModel = viewModel(

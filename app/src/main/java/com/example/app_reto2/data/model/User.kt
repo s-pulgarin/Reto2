@@ -11,5 +11,6 @@ data class User(
     val uid: String = "",
     val email: String = "",
     val role: String = UserRole.USER,
-    val balance: Double = INITIAL_BALANCE
+    val balance: Double = INITIAL_BALANCE,
+    val kycDocumentUrl: String? = null
 )

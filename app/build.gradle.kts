@@ -86,4 +86,6 @@ dependencies {
     // Red
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
+
+    implementation(libs.androidx.compose.material.icons.core)
 }

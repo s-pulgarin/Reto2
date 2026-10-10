@@ -31,12 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.app_reto2.data.model.TransactionType
 import androidx.compose.ui.text.style.TextAlign
-
+import androidx.compose.material3.OutlinedButton
 private val AmountRegex = Regex("^\\d*\\.?\\d*$")
 
 @Composable
 fun UserDashboardScreen(
     viewModel: UserDashboardViewModel,
+    onNavigateToKyc: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -45,6 +46,7 @@ fun UserDashboardScreen(
         state = state,
         onRefresh = viewModel::loadPrice,
         onTrade = viewModel::executeTrade,
+        onNavigateToKyc = onNavigateToKyc,
         modifier = modifier
     )
 }
@@ -54,6 +56,7 @@ private fun UserDashboardContent(
     state: UserDashboardState,
     onRefresh: () -> Unit,
     onTrade: (amount: Double, tradeType: String) -> Unit,
+    onNavigateToKyc: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var amountText by rememberSaveable { mutableStateOf("") }
@@ -78,6 +81,13 @@ private fun UserDashboardContent(
             text = "Mercado de divisas",
             style = MaterialTheme.typography.headlineMedium
         )
+
+        OutlinedButton(
+            onClick = onNavigateToKyc,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Verificar identidad (KYC)")
+        }
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
