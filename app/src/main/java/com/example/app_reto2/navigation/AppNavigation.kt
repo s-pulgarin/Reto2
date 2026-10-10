@@ -11,11 +11,13 @@ import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.data.repository.AuthRepositoryImpl
 import com.example.app_reto2.data.repository.FinnhubRepositoryImpl
 import com.example.app_reto2.data.repository.TransactionRepositoryImpl
+import com.example.app_reto2.ui.admin.AdminDashboardScreen
+import com.example.app_reto2.ui.admin.AdminDashboardViewModel
+import com.example.app_reto2.ui.admin.AdminDashboardViewModelFactory
 import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.AuthViewModelFactory
 import com.example.app_reto2.ui.auth.screens.LoginScreen
 import com.example.app_reto2.ui.auth.screens.RegisterScreen
-import com.example.app_reto2.ui.dashboard.AdminDashboardScreen
 import com.example.app_reto2.ui.user.UserDashboardScreen
 import com.example.app_reto2.ui.user.UserDashboardViewModel
 import com.example.app_reto2.ui.user.UserDashboardViewModelFactory
@@ -69,6 +71,16 @@ fun AppNavigation() {
             )
             UserDashboardScreen(viewModel = userDashboardViewModel)
         }
-        composable(Screen.AdminDashboard.route) { AdminDashboardScreen() }
+        composable(Screen.AdminDashboard.route) {
+            val adminDashboardViewModel: AdminDashboardViewModel = viewModel(
+                factory = remember {
+                    AdminDashboardViewModelFactory(
+                        finnhubRepository = FinnhubRepositoryImpl(),
+                        transactionRepository = TransactionRepositoryImpl()
+                    )
+                }
+            )
+            AdminDashboardScreen(viewModel = adminDashboardViewModel)
+        }
     }
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.app_reto2.util.MarketConfig
 
 data class UserDashboardState(
     val currencyPair: String = "",
@@ -33,7 +34,7 @@ class UserDashboardViewModel(
     private val userIdProvider: () -> String? = { FirebaseAuth.getInstance().uid }
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(UserDashboardState(currencyPair = CURRENCY_PAIR))
+    private val _state = MutableStateFlow(UserDashboardState(currencyPair = MarketConfig.CURRENCY_PAIR))
     val state: StateFlow<UserDashboardState> = _state.asStateFlow()
 
     private var priceJob: Job? = null
@@ -59,7 +60,7 @@ class UserDashboardViewModel(
                 delay(NO_TICK_NOTICE_MS)
                 _state.update { it.copy(statusMessage = NO_TICK_MESSAGE) }
             }
-            finnhubRepository.observePrice(SYMBOL).collect { result ->
+            finnhubRepository.observePrice(MarketConfig.SYMBOL).collect { result ->
                 waitNotice.cancel()
                 when (result) {
                     is Resource.Success -> _state.update {
@@ -120,8 +121,6 @@ class UserDashboardViewModel(
     }
 
     private companion object {
-        const val SYMBOL = "BINANCE:BTCUSDT"
-        const val CURRENCY_PAIR = "BTCUSDT"
         const val NO_TICK_NOTICE_MS = 8_000L
         const val NO_TICK_MESSAGE =
             "Esperando cotizaciones… Si el mercado forex está cerrado (viernes en la tarde a domingo), no habrá precios hasta que abra."

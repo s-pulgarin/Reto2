@@ -10,6 +10,8 @@ object TransactionType {
 
 object TransactionStatus {
     const val PENDING = "PENDING"
+    const val APPROVED = "APPROVED"
+    const val REJECTED = "REJECTED"
 }
 
 data class Transaction(
