@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571767917667",
+    "project_id": "appreto2",
+    "storage_bucket": "appreto2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571767917667:android:f15bded13d4af3d4ef3c56",
+        "android_client_info": {
+          "package_name": "com.example.app_reto2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNIaP4RhtE1R8h3RkhK7NDF7dj3cQjI_k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
