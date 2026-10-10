@@ -9,12 +9,16 @@ import androidx.navigation.compose.rememberNavController
 import com.example.app_reto2.data.model.User
 import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.data.repository.AuthRepositoryImpl
+import com.example.app_reto2.data.repository.FinnhubRepositoryImpl
+import com.example.app_reto2.data.repository.TransactionRepositoryImpl
 import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.AuthViewModelFactory
 import com.example.app_reto2.ui.auth.screens.LoginScreen
 import com.example.app_reto2.ui.auth.screens.RegisterScreen
 import com.example.app_reto2.ui.dashboard.AdminDashboardScreen
-import com.example.app_reto2.ui.dashboard.UserDashboardScreen
+import com.example.app_reto2.ui.user.UserDashboardScreen
+import com.example.app_reto2.ui.user.UserDashboardViewModel
+import com.example.app_reto2.ui.user.UserDashboardViewModelFactory
 
 @Composable
 fun AppNavigation() {
@@ -25,8 +29,6 @@ fun AppNavigation() {
         factory = AuthViewModelFactory(authRepository)
     )
 
-    // Redirige según el rol. Con sesión activa, el ViewModel emite Success al iniciar
-    // y Login navega automáticamente al dashboard correspondiente.
     val goToDashboard: (User) -> Unit = { user ->
         val destination = if (user.role == UserRole.ADMIN) {
             Screen.AdminDashboard.route
@@ -56,7 +58,17 @@ fun AppNavigation() {
                 onNavigateToLogin = { navController.popBackStack() }
             )
         }
-        composable(Screen.UserDashboard.route) { UserDashboardScreen() }
+        composable(Screen.UserDashboard.route) {
+            val userDashboardViewModel: UserDashboardViewModel = viewModel(
+                factory = remember {
+                    UserDashboardViewModelFactory(
+                        finnhubRepository = FinnhubRepositoryImpl(),
+                        transactionRepository = TransactionRepositoryImpl()
+                    )
+                }
+            )
+            UserDashboardScreen(viewModel = userDashboardViewModel)
+        }
         composable(Screen.AdminDashboard.route) { AdminDashboardScreen() }
     }
 }
