@@ -1,18 +1,16 @@
 package com.example.app_reto2.data.repository
 
-import com.example.app_reto2.data.model.AuthUser
+import com.example.app_reto2.data.model.User
 import com.example.app_reto2.util.AuthResult
 
 interface AuthRepository {
-    val currentUser: AuthUser?
+    val hasSession: Boolean
 
-    suspend fun login(email: String, password: String): AuthResult<AuthUser>
+    suspend fun restoreSession(): AuthResult<User>
 
-    suspend fun register(
-        email: String,
-        password: String,
-        displayName: String? = null
-    ): AuthResult<AuthUser>
+    suspend fun login(email: String, password: String): AuthResult<User>
+
+    suspend fun register(email: String, password: String): AuthResult<User>
 
     suspend fun logout(): AuthResult<Unit>
 }

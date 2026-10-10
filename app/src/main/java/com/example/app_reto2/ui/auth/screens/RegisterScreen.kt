@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.app_reto2.data.model.AuthUser
+import com.example.app_reto2.data.model.User
 import com.example.app_reto2.ui.auth.AuthState
 import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.components.AuthFeedback
@@ -33,7 +33,7 @@ import com.example.app_reto2.ui.auth.components.PasswordTextField
 @Composable
 fun RegisterScreen(
     viewModel: AuthViewModel,
-    onRegisterSuccess: (AuthUser) -> Unit,
+    onRegisterSuccess: (User) -> Unit,
     onNavigateToLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {

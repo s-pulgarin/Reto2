@@ -6,12 +6,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.app_reto2.data.model.User
+import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.data.repository.AuthRepositoryImpl
 import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.AuthViewModelFactory
 import com.example.app_reto2.ui.auth.screens.LoginScreen
 import com.example.app_reto2.ui.auth.screens.RegisterScreen
-import com.example.app_reto2.ui.home.HomeScreen
+import com.example.app_reto2.ui.dashboard.AdminDashboardScreen
+import com.example.app_reto2.ui.dashboard.UserDashboardScreen
 
 @Composable
 fun AppNavigation() {
@@ -22,37 +25,38 @@ fun AppNavigation() {
         factory = AuthViewModelFactory(authRepository)
     )
 
-    // Si ya hay sesión activa en Firebase, arranca directamente en Home
-    val startDestination = remember {
-        if (authRepository.currentUser != null) Screen.Home.route else Screen.Login.route
-    }
-
-    val goToHome: () -> Unit = {
-        navController.navigate(Screen.Home.route) {
+    // Redirige según el rol. Con sesión activa, el ViewModel emite Success al iniciar
+    // y Login navega automáticamente al dashboard correspondiente.
+    val goToDashboard: (User) -> Unit = { user ->
+        val destination = if (user.role == UserRole.ADMIN) {
+            Screen.AdminDashboard.route
+        } else {
+            Screen.UserDashboard.route
+        }
+        navController.navigate(destination) {
             popUpTo(Screen.Login.route) { inclusive = true }
         }
     }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = Screen.Login.route
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
                 viewModel = authViewModel,
-                onLoginSuccess = { goToHome() },
+                onLoginSuccess = goToDashboard,
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) }
             )
         }
         composable(Screen.Register.route) {
             RegisterScreen(
                 viewModel = authViewModel,
-                onRegisterSuccess = { goToHome() },
+                onRegisterSuccess = goToDashboard,
                 onNavigateToLogin = { navController.popBackStack() }
             )
         }
-        composable(Screen.Home.route) {
-            HomeScreen()
-        }
+        composable(Screen.UserDashboard.route) { UserDashboardScreen() }
+        composable(Screen.AdminDashboard.route) { AdminDashboardScreen() }
     }
 }

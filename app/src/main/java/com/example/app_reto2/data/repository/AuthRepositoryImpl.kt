@@ -1,8 +1,8 @@
 package com.example.app_reto2.data.repository
 
-package com.example.app_reto2.data.repository
-
-import com.example.app_reto2.data.model.AuthUser
+import com.example.app_reto2.data.model.INITIAL_BALANCE
+import com.example.app_reto2.data.model.User
+import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.util.AuthResult
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
@@ -11,48 +11,62 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 class AuthRepositoryImpl(
-    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) : AuthRepository {
 
-    override val currentUser: AuthUser?
-        get() = firebaseAuth.currentUser?.toAuthUser()
+    private val usersCollection get() = firestore.collection(USERS_COLLECTION)
 
-    override suspend fun login(email: String, password: String): AuthResult<AuthUser> =
+    override val hasSession: Boolean
+        get() = firebaseAuth.currentUser != null
+
+    override suspend fun restoreSession(): AuthResult<User> =
         try {
-            val user = firebaseAuth.signInWithEmailAndPassword(email, password)
-                .await()
-                .user
-                ?: return AuthResult.Error("No se pudo obtener el usuario.")
-            AuthResult.Success(user.toAuthUser())
+            val firebaseUser = firebaseAuth.currentUser
+                ?: return AuthResult.Error("No hay una sesión activa.")
+            AuthResult.Success(fetchOrCreateProfile(firebaseUser))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AuthResult.Error(e.toFriendlyMessage(), e)
         }
 
-    override suspend fun register(
-        email: String,
-        password: String,
-        displayName: String?
-    ): AuthResult<AuthUser> =
+    override suspend fun login(email: String, password: String): AuthResult<User> =
         try {
-            val user = firebaseAuth.createUserWithEmailAndPassword(email, password)
+            val firebaseUser = firebaseAuth.signInWithEmailAndPassword(email, password)
+                .await()
+                .user
+                ?: return AuthResult.Error("No se pudo obtener el usuario.")
+            try {
+                AuthResult.Success(fetchOrCreateProfile(firebaseUser))
+            } catch (e: Exception) {
+                firebaseAuth.signOut() // evita sesión a medias sin rol
+                throw e
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AuthResult.Error(e.toFriendlyMessage(), e)
+        }
+
+    override suspend fun register(email: String, password: String): AuthResult<User> =
+        try {
+            val firebaseUser = firebaseAuth.createUserWithEmailAndPassword(email, password)
                 .await()
                 .user
                 ?: return AuthResult.Error("No se pudo crear el usuario.")
-
-            if (!displayName.isNullOrBlank()) {
-                val profile = UserProfileChangeRequest.Builder()
-                    .setDisplayName(displayName.trim())
-                    .build()
-                user.updateProfile(profile).await()
+            try {
+                AuthResult.Success(createProfile(firebaseUser))
+            } catch (e: Exception) {
+                runCatching { firebaseUser.delete().await() } // rollback de la cuenta
+                throw e
             }
-            AuthResult.Success(user.toAuthUser())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -67,11 +81,23 @@ class AuthRepositoryImpl(
             AuthResult.Error(e.toFriendlyMessage(), e)
         }
 
-    private fun FirebaseUser.toAuthUser() = AuthUser(
-        id = uid,
-        email = email,
-        displayName = displayName
-    )
+    /** Lee users/{uid}; si no existe (cuentas anteriores a esta fase) lo crea con rol "user". */
+    private suspend fun fetchOrCreateProfile(firebaseUser: FirebaseUser): User {
+        val snapshot = usersCollection.document(firebaseUser.uid).get().await()
+        return snapshot.toObject(User::class.java)?.copy(uid = firebaseUser.uid)
+            ?: createProfile(firebaseUser)
+    }
+
+    private suspend fun createProfile(firebaseUser: FirebaseUser): User {
+        val user = User(
+            uid = firebaseUser.uid,
+            email = firebaseUser.email.orEmpty(),
+            role = UserRole.USER,
+            balance = INITIAL_BALANCE
+        )
+        usersCollection.document(user.uid).set(user).await()
+        return user
+    }
 
     private fun Exception.toFriendlyMessage(): String = when (this) {
         is FirebaseAuthInvalidUserException -> "No existe una cuenta con ese correo."
@@ -79,6 +105,15 @@ class AuthRepositoryImpl(
         is FirebaseAuthUserCollisionException -> "Ya existe una cuenta con ese correo."
         is FirebaseAuthWeakPasswordException -> "La contraseña es demasiado débil."
         is FirebaseNetworkException -> "Sin conexión. Revisa tu internet."
+        is FirebaseFirestoreException -> when (code) {
+            FirebaseFirestoreException.Code.PERMISSION_DENIED -> "Sin permisos para acceder al perfil."
+            FirebaseFirestoreException.Code.UNAVAILABLE -> "Sin conexión. Revisa tu internet."
+            else -> "Error al acceder al perfil."
+        }
         else -> message ?: "Ocurrió un error inesperado."
+    }
+
+    private companion object {
+        const val USERS_COLLECTION = "users"
     }
 }
