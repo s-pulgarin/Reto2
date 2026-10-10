@@ -64,4 +64,6 @@ dependencies {
     // Jetpack Compose: Navigation y ViewModel
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    implementation(libs.kotlinx.coroutines.play.services)
 }
