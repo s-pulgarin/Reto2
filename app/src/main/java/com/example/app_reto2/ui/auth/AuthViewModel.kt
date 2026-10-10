@@ -41,6 +41,15 @@ class AuthViewModel(
         _state.value = AuthState.Idle
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            _state.value = when (val result = authRepository.logout()) {
+                is AuthResult.Success -> AuthState.LoggedOut
+                is AuthResult.Error -> AuthState.Error(result.message)
+            }
+        }
+    }
+
     // Si ya hay sesión en Firebase, recupera el perfil (rol) y emite Success
     private fun restoreSession() {
         if (!authRepository.hasSession) return

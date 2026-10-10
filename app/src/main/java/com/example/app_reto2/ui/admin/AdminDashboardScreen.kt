@@ -38,6 +38,10 @@ import com.example.app_reto2.data.model.TransactionStatus
 import com.example.app_reto2.data.model.TransactionType
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 
 private val ApprovedColor = Color(0xFF2E7D32)
 
@@ -45,6 +49,7 @@ private val ApprovedColor = Color(0xFF2E7D32)
 @Composable
 fun AdminDashboardScreen(
     viewModel: AdminDashboardViewModel,
+    onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -66,7 +71,7 @@ fun AdminDashboardScreen(
                 title = { Text("Auditoría") },
                 actions = {
                     Column(
-                        modifier = Modifier.padding(end = 16.dp),
+                        modifier = Modifier.padding(end = 4.dp),
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(text = pairLabel, style = MaterialTheme.typography.labelSmall)
@@ -74,6 +79,12 @@ fun AdminDashboardScreen(
                             text = state.livePrice?.let { "%.4f".format(it) } ?: "--",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Cerrar sesión"
                         )
                     }
                 }

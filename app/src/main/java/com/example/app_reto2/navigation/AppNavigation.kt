@@ -1,7 +1,10 @@
 package com.example.app_reto2.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,6 +19,7 @@ import com.example.app_reto2.data.repository.UserRepositoryImpl
 import com.example.app_reto2.ui.admin.AdminDashboardScreen
 import com.example.app_reto2.ui.admin.AdminDashboardViewModel
 import com.example.app_reto2.ui.admin.AdminDashboardViewModelFactory
+import com.example.app_reto2.ui.auth.AuthState
 import com.example.app_reto2.ui.auth.AuthViewModel
 import com.example.app_reto2.ui.auth.AuthViewModelFactory
 import com.example.app_reto2.ui.auth.screens.LoginScreen
@@ -35,6 +39,18 @@ fun AppNavigation() {
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository)
     )
+    val authState by authViewModel.state.collectAsStateWithLifecycle()
+
+    // Al cerrar sesión: vuelve a Login y destruye TODO el backstack
+    LaunchedEffect(authState) {
+        if (authState is AuthState.LoggedOut) {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
+            authViewModel.resetState()
+        }
+    }
 
     val goToDashboard: (User) -> Unit = { user ->
         val destination = if (user.role == UserRole.ADMIN) {
@@ -76,7 +92,8 @@ fun AppNavigation() {
             )
             UserDashboardScreen(
                 viewModel = userDashboardViewModel,
-                onNavigateToKyc = { navController.navigate(Screen.Kyc.route) }
+                onNavigateToKyc = { navController.navigate(Screen.Kyc.route) },
+                onLogout = authViewModel::logout
             )
         }
         composable(Screen.Kyc.route) {
@@ -102,7 +119,10 @@ fun AppNavigation() {
                     )
                 }
             )
-            AdminDashboardScreen(viewModel = adminDashboardViewModel)
+            AdminDashboardScreen(
+                viewModel = adminDashboardViewModel,
+                onLogout = authViewModel::logout
+            )
         }
     }
 }
