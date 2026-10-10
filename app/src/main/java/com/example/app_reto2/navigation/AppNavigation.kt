@@ -86,7 +86,8 @@ fun AppNavigation() {
                 factory = remember {
                     UserDashboardViewModelFactory(
                         finnhubRepository = FinnhubRepositoryImpl(),
-                        transactionRepository = TransactionRepositoryImpl()
+                        transactionRepository = TransactionRepositoryImpl(),
+                        userRepository = UserRepositoryImpl()
                     )
                 }
             )

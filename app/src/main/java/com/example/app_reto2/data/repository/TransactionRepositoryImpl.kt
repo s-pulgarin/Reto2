@@ -5,6 +5,7 @@ import com.example.app_reto2.data.model.TransactionStatus
 import com.example.app_reto2.data.model.TransactionType
 import com.example.app_reto2.util.Resource
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
@@ -52,6 +53,26 @@ class TransactionRepositoryImpl(
         awaitClose { registration.remove() }
     }
 
+    override fun getUserTransactions(uid: String): Flow<Resource<List<Transaction>>> = callbackFlow {
+        val registration = firestore.collection(TRANSACTIONS_COLLECTION)
+            .whereEqualTo("userId", uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(Resource.Error(error.toFriendlyMessage(), error))
+                    return@addSnapshotListener
+                }
+                val transactions = snapshot?.documents.orEmpty()
+                    .mapNotNull { document ->
+                        document
+                            .toObject(Transaction::class.java, ServerTimestampBehavior.ESTIMATE)
+                            ?.copy(transactionId = document.id)
+                    }
+                    .sortedByDescending { it.timestamp?.time ?: Long.MAX_VALUE }
+                trySend(Resource.Success(transactions))
+            }
+        awaitClose { registration.remove() }
+    }
+
     override suspend fun auditTransaction(
         transaction: Transaction,
         isApproved: Boolean
@@ -82,8 +103,8 @@ class TransactionRepositoryImpl(
         }
 
     /**
-     * BUY resta y SELL suma el `amount` al balance del usuario. Si una compra deja el
-     * balance en negativo, la transacción se rechaza sin tocar el balance.
+     * BUY resta y SELL suma `amount × executionPrice` al balance del usuario. Si una compra
+     * dejaría el balance en negativo, la transacción se rechaza sin tocar el balance.
      * Devuelve el estado final a asignar a la transacción.
      */
     private fun applyBalanceChange(
@@ -94,13 +115,16 @@ class TransactionRepositoryImpl(
             ?: error("La transacción no tiene usuario.")
         val amount = transactionSnapshot.getDouble("amount")
             ?: error("La transacción no tiene cantidad.")
+        val price = transactionSnapshot.getDouble("executionPrice")
+            ?: error("La transacción no tiene precio de ejecución.")
         val type = transactionSnapshot.getString("type")
 
         val userRef = firestore.collection(USERS_COLLECTION).document(userId)
         val balance = firestoreTransaction.get(userRef).getDouble("balance")
             ?: error("No se encontró el balance del usuario.")
 
-        val newBalance = if (type == TransactionType.BUY) balance - amount else balance + amount
+        val cost = amount * price
+        val newBalance = if (type == TransactionType.BUY) balance - cost else balance + cost
         if (newBalance < 0.0) return TransactionStatus.REJECTED
 
         firestoreTransaction.update(userRef, "balance", newBalance)

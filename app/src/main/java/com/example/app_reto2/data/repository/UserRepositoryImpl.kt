@@ -6,6 +6,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 
@@ -42,6 +45,19 @@ class UserRepositoryImpl(
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Ocurrió un error inesperado.", e)
         }
+    }
+
+    override fun observeUserBalance(uid: String): Flow<Double> = callbackFlow {
+        val registration = firestore.collection(USERS_COLLECTION)
+            .document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                snapshot?.getDouble("balance")?.let { trySend(it) }
+            }
+        awaitClose { registration.remove() }
     }
 
     private companion object {

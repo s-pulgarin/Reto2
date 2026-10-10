@@ -7,6 +7,8 @@ import com.example.app_reto2.data.model.TransactionStatus
 import com.example.app_reto2.data.model.TransactionType
 import com.example.app_reto2.data.repository.FinnhubRepository
 import com.example.app_reto2.data.repository.TransactionRepository
+import com.example.app_reto2.data.repository.UserRepository
+import com.example.app_reto2.util.MarketConfig
 import com.example.app_reto2.util.Resource
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Job
@@ -14,14 +16,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.example.app_reto2.util.MarketConfig
 
 data class UserDashboardState(
     val currencyPair: String = "",
     val price: Double? = null,
     val isLoadingPrice: Boolean = true,
+    val balance: Double? = null,
+    val transactions: List<Transaction> = emptyList(),
+    val isLoadingHistory: Boolean = true,
     val isSavingTrade: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
@@ -31,6 +36,7 @@ data class UserDashboardState(
 class UserDashboardViewModel(
     private val finnhubRepository: FinnhubRepository,
     private val transactionRepository: TransactionRepository,
+    private val userRepository: UserRepository,
     private val userIdProvider: () -> String? = { FirebaseAuth.getInstance().uid }
 ) : ViewModel() {
 
@@ -41,6 +47,7 @@ class UserDashboardViewModel(
 
     init {
         loadPrice()
+        observeUserData()
     }
 
     /** Abre (o reabre) la conexión de precios en tiempo real. */
@@ -79,6 +86,36 @@ class UserDashboardViewModel(
         }
     }
 
+    /** Mantiene actualizados el saldo y el historial del usuario autenticado. */
+    private fun observeUserData() {
+        val userId = userIdProvider()
+        if (userId == null) {
+            _state.update {
+                it.copy(isLoadingHistory = false, errorMessage = "No hay una sesión activa.")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            userRepository.observeUserBalance(userId)
+                .catch { _state.update { it.copy(errorMessage = "No se pudo cargar tu saldo.") } }
+                .collect { balance -> _state.update { it.copy(balance = balance) } }
+        }
+
+        viewModelScope.launch {
+            transactionRepository.getUserTransactions(userId).collect { result ->
+                when (result) {
+                    is Resource.Success -> _state.update {
+                        it.copy(transactions = result.data, isLoadingHistory = false)
+                    }
+                    is Resource.Error -> _state.update {
+                        it.copy(isLoadingHistory = false, errorMessage = result.message)
+                    }
+                }
+            }
+        }
+    }
+
     fun executeTrade(amount: Double, tradeType: String) {
         val current = _state.value
         if (current.isSavingTrade) return
@@ -90,6 +127,10 @@ class UserDashboardViewModel(
         }
         if (!(amount > 0.0) || amount.isInfinite()) {
             return fail("Ingresa una cantidad válida.")
+        }
+        if (tradeType == TransactionType.BUY) {
+            val balance = current.balance ?: return fail("Tu saldo aún no está disponible.")
+            if (amount * price > balance) return fail("Saldo insuficiente para esta compra.")
         }
 
         _state.update { it.copy(isSavingTrade = true, errorMessage = null, successMessage = null) }
