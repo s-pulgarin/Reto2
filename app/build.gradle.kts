@@ -88,4 +88,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.compose.material.icons.core)
+
+    // Biometría (BiometricPrompt requiere FragmentActivity)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
 }

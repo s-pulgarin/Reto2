@@ -1,7 +1,6 @@
 package com.example.app_reto2
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,10 +8,12 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import com.example.app_reto2.navigation.AppNavigation
 import com.example.app_reto2.ui.theme.App_Reto2Theme
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (no AppCompatActivity) porque BiometricPrompt la exige y el tema no es AppCompat.
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

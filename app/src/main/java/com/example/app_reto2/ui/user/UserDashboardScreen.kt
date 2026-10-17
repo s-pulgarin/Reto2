@@ -42,14 +42,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.app_reto2.data.model.Transaction
 import com.example.app_reto2.data.model.TransactionStatus
 import com.example.app_reto2.data.model.TransactionType
+import com.example.app_reto2.util.BiometricHelper
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -76,11 +79,21 @@ fun UserDashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val activity = LocalContext.current as FragmentActivity
+    var authError by rememberSaveable { mutableStateOf<String?>(null) }
 
     UserDashboardContent(
         state = state,
+        authError = authError,
         onRefresh = viewModel::loadPrice,
-        onTrade = viewModel::executeTrade,
+        onTrade = { amount, tradeType ->
+            authError = null
+            BiometricHelper.authenticate(
+                activity = activity,
+                onSuccess = { viewModel.executeTrade(amount, tradeType) },
+                onError = { authError = it }
+            )
+        },
         onNavigateToKyc = onNavigateToKyc,
         onLogout = onLogout,
         modifier = modifier
@@ -91,6 +104,7 @@ fun UserDashboardScreen(
 @Composable
 private fun UserDashboardContent(
     state: UserDashboardState,
+    authError: String?,
     onRefresh: () -> Unit,
     onTrade: (amount: Double, tradeType: String) -> Unit,
     onNavigateToKyc: () -> Unit,
@@ -143,6 +157,7 @@ private fun UserDashboardContent(
             item {
                 TradeSection(
                     state = state,
+                    authError = authError,
                     amountText = amountText,
                     onAmountChange = { amountText = it },
                     onTrade = onTrade
@@ -249,6 +264,7 @@ private fun MarketCard(
 @Composable
 private fun TradeSection(
     state: UserDashboardState,
+    authError: String?,
     amountText: String,
     onAmountChange: (String) -> Unit,
     onTrade: (amount: Double, tradeType: String) -> Unit
@@ -284,7 +300,7 @@ private fun TradeSection(
                 CircularProgressIndicator(modifier = Modifier.size(32.dp))
             }
         }
-        state.errorMessage?.let {
+        (authError ?: state.errorMessage)?.let {
             Text(text = it, color = MaterialTheme.colorScheme.error)
         }
         state.successMessage?.let {
