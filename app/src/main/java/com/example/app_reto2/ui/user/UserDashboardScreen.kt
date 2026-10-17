@@ -271,12 +271,21 @@ private fun TradeSection(
 ) {
     val amount = amountText.toDoubleOrNull() ?: 0.0
     val price = state.price
-    val balance = state.balance
+    val availableBalance = state.availableBalance
+    val availableHoldings = state.availableHoldings
     val total = price?.let { amount * it }
-    val exceedsBalance = total != null && balance != null && total > balance
+    val exceedsBalance = total != null && availableBalance != null && total > availableBalance
+    val exceedsHoldings = availableHoldings != null && amount > availableHoldings
     val canTrade = price != null && !state.isLoadingPrice && !state.isSavingTrade
+    val canSell = canTrade && availableHoldings != null && availableHoldings > 0.0 && !exceedsHoldings
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        HoldingsLabel(
+            asset = state.baseAsset,
+            holdings = state.holdings,
+            pendingSellAmount = state.pendingSellAmount
+        )
+
         OutlinedTextField(
             value = amountText,
             onValueChange = { if (AmountRegex.matches(it)) onAmountChange(it) },
@@ -284,12 +293,15 @@ private fun TradeSection(
             enabled = !state.isSavingTrade,
             label = { Text("Cantidad a operar") },
             singleLine = true,
-            isError = exceedsBalance,
+            isError = exceedsBalance && exceedsHoldings,
             supportingText = {
-                if (exceedsBalance) {
-                    Text("El total supera tu saldo disponible (aplica a compras).")
-                } else if (total != null && amount > 0.0) {
-                    Text("Total estimado: ${formatMoney(total)}")
+                when {
+                    exceedsBalance && exceedsHoldings ->
+                        Text("Supera tu saldo libre y tus ${state.baseAsset} disponibles.")
+                    exceedsBalance -> Text("Supera tu saldo libre: solo puedes vender.")
+                    exceedsHoldings && amount > 0.0 ->
+                        Text("Supera tus ${state.baseAsset} disponibles: solo puedes comprar.")
+                    total != null && amount > 0.0 -> Text("Total estimado: ${formatMoney(total)}")
                 }
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
@@ -320,7 +332,7 @@ private fun TradeSection(
             }
             Button(
                 onClick = { onTrade(amount, TransactionType.SELL) },
-                enabled = canTrade,
+                enabled = canSell,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError
@@ -329,6 +341,24 @@ private fun TradeSection(
             ) {
                 Text("VENDER")
             }
+        }
+    }
+}
+
+@Composable
+private fun HoldingsLabel(asset: String, holdings: Double?, pendingSellAmount: Double) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "Tienes: ${holdings?.let(::formatAmount) ?: "--"} $asset",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (pendingSellAmount > 0.0) {
+            Text(
+                text = "${formatAmount(pendingSellAmount)} $asset en ventas pendientes",
+                style = MaterialTheme.typography.bodySmall,
+                color = PendingColor
+            )
         }
     }
 }

@@ -6,6 +6,7 @@ import com.example.app_reto2.data.model.TransactionType
 import com.example.app_reto2.util.Resource
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
@@ -103,8 +104,9 @@ class TransactionRepositoryImpl(
         }
 
     /**
-     * BUY resta y SELL suma `amount × executionPrice` al balance del usuario. Si una compra
-     * dejaría el balance en negativo, la transacción se rechaza sin tocar el balance.
+     * BUY resta `amount × executionPrice` del balance y suma `amount` al portfolio del par;
+     * SELL hace lo inverso. Si una compra dejaría el balance en negativo, o una venta supera
+     * las unidades en el portfolio, la transacción se rechaza sin tocar el perfil.
      * Devuelve el estado final a asignar a la transacción.
      */
     private fun applyBalanceChange(
@@ -117,17 +119,31 @@ class TransactionRepositoryImpl(
             ?: error("La transacción no tiene cantidad.")
         val price = transactionSnapshot.getDouble("executionPrice")
             ?: error("La transacción no tiene precio de ejecución.")
+        val currencyPair = transactionSnapshot.getString("currencyPair")
+            ?.takeIf { it.isNotBlank() }
+            ?: error("La transacción no tiene par de divisas.")
         val type = transactionSnapshot.getString("type")
 
         val userRef = firestore.collection(USERS_COLLECTION).document(userId)
-        val balance = firestoreTransaction.get(userRef).getDouble("balance")
+        val userSnapshot = firestoreTransaction.get(userRef)
+        val balance = userSnapshot.getDouble("balance")
             ?: error("No se encontró el balance del usuario.")
+        val portfolioPath = FieldPath.of(PORTFOLIO_FIELD, currencyPair)
+        val holdings = (userSnapshot.get(portfolioPath) as? Number)?.toDouble() ?: 0.0
 
         val cost = amount * price
-        val newBalance = if (type == TransactionType.BUY) balance - cost else balance + cost
-        if (newBalance < 0.0) return TransactionStatus.REJECTED
+        val (newBalance, newHoldings) = if (type == TransactionType.BUY) {
+            balance - cost to holdings + amount
+        } else {
+            balance + cost to holdings - amount
+        }
+        if (newBalance < 0.0 || newHoldings < -QUANTITY_EPSILON) return TransactionStatus.REJECTED
 
-        firestoreTransaction.update(userRef, "balance", newBalance)
+        firestoreTransaction.update(
+            userRef,
+            FieldPath.of("balance"), newBalance,
+            portfolioPath, newHoldings.coerceAtLeast(0.0)
+        )
         return TransactionStatus.APPROVED
     }
 
@@ -143,6 +159,10 @@ class TransactionRepositoryImpl(
     private companion object {
         const val TRANSACTIONS_COLLECTION = "transactions"
         const val USERS_COLLECTION = "users"
+        const val PORTFOLIO_FIELD = "portfolio"
         const val SAVE_TIMEOUT_MS = 10_000L
+
+        /** Tolerancia para errores de redondeo de Double al restar unidades. */
+        const val QUANTITY_EPSILON = 1e-9
     }
 }

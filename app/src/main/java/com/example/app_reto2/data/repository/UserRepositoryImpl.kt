@@ -1,5 +1,6 @@
 package com.example.app_reto2.data.repository
 
+import com.example.app_reto2.data.model.User
 import com.example.app_reto2.util.Resource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -47,7 +48,7 @@ class UserRepositoryImpl(
         }
     }
 
-    override fun observeUserBalance(uid: String): Flow<Double> = callbackFlow {
+    override fun observeUser(uid: String): Flow<User> = callbackFlow {
         val registration = firestore.collection(USERS_COLLECTION)
             .document(uid)
             .addSnapshotListener { snapshot, error ->
@@ -55,7 +56,12 @@ class UserRepositoryImpl(
                     close(error)
                     return@addSnapshotListener
                 }
-                snapshot?.getDouble("balance")?.let { trySend(it) }
+                if (snapshot?.getDouble("balance") == null) return@addSnapshotListener
+                try {
+                    snapshot.toObject(User::class.java)?.let { trySend(it.copy(uid = uid)) }
+                } catch (e: RuntimeException) {
+                    close(e)
+                }
             }
         awaitClose { registration.remove() }
     }

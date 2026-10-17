@@ -25,13 +25,41 @@ data class UserDashboardState(
     val price: Double? = null,
     val isLoadingPrice: Boolean = true,
     val balance: Double? = null,
+    val portfolio: Map<String, Double>? = null,
     val transactions: List<Transaction> = emptyList(),
     val isLoadingHistory: Boolean = true,
     val isSavingTrade: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null
-)
+) {
+    /** Activo base del par (ej. "BTC" en "BTCUSDT"). */
+    val baseAsset: String get() = currencyPair.take(3)
+
+    /** Unidades del par en el portfolio; null mientras no carga el perfil. */
+    val holdings: Double? get() = portfolio?.let { it[currencyPair] ?: 0.0 }
+
+    private val pending: List<Transaction>
+        get() = transactions.filter {
+            it.status == TransactionStatus.PENDING && it.currencyPair == currencyPair
+        }
+
+    /** Unidades comprometidas en ventas PENDING del par. */
+    val pendingSellAmount: Double
+        get() = pending.filter { it.type == TransactionType.SELL }.sumOf { it.amount }
+
+    /** Dólares comprometidos en compras PENDING (de cualquier par: el saldo es único). */
+    val pendingBuyCost: Double
+        get() = transactions
+            .filter { it.status == TransactionStatus.PENDING && it.type == TransactionType.BUY }
+            .sumOf { it.amount * it.executionPrice }
+
+    /** Saldo libre para nuevas compras. */
+    val availableBalance: Double? get() = balance?.let { (it - pendingBuyCost).coerceAtLeast(0.0) }
+
+    /** Unidades libres para nuevas ventas. */
+    val availableHoldings: Double? get() = holdings?.let { (it - pendingSellAmount).coerceAtLeast(0.0) }
+}
 
 class UserDashboardViewModel(
     private val finnhubRepository: FinnhubRepository,
@@ -97,9 +125,11 @@ class UserDashboardViewModel(
         }
 
         viewModelScope.launch {
-            userRepository.observeUserBalance(userId)
+            userRepository.observeUser(userId)
                 .catch { _state.update { it.copy(errorMessage = "No se pudo cargar tu saldo.") } }
-                .collect { balance -> _state.update { it.copy(balance = balance) } }
+                .collect { user ->
+                    _state.update { it.copy(balance = user.balance, portfolio = user.portfolio) }
+                }
         }
 
         viewModelScope.launch {
@@ -129,8 +159,28 @@ class UserDashboardViewModel(
             return fail("Ingresa una cantidad válida.")
         }
         if (tradeType == TransactionType.BUY) {
-            val balance = current.balance ?: return fail("Tu saldo aún no está disponible.")
-            if (amount * price > balance) return fail("Saldo insuficiente para esta compra.")
+            val available = current.availableBalance ?: return fail("Tu saldo aún no está disponible.")
+            if (amount * price > available) {
+                return fail(
+                    if (current.pendingBuyCost > 0.0) {
+                        "Saldo insuficiente: tienes compras pendientes que comprometen parte de tu saldo."
+                    } else {
+                        "Saldo insuficiente para esta compra."
+                    }
+                )
+            }
+        } else {
+            val available = current.availableHoldings
+                ?: return fail("Tu portafolio aún no está disponible.")
+            if (amount > available) {
+                return fail(
+                    if (current.pendingSellAmount > 0.0) {
+                        "Unidades insuficientes: solo tienes ${available.toPlainAmount()} ${current.baseAsset} libres (el resto está en ventas pendientes)."
+                    } else {
+                        "Unidades insuficientes: solo tienes ${available.toPlainAmount()} ${current.baseAsset}."
+                    }
+                )
+            }
         }
 
         _state.update { it.copy(isSavingTrade = true, errorMessage = null, successMessage = null) }
@@ -160,6 +210,8 @@ class UserDashboardViewModel(
     private fun fail(message: String) {
         _state.update { it.copy(errorMessage = message, successMessage = null) }
     }
+
+    private fun Double.toPlainAmount(): String = toBigDecimal().stripTrailingZeros().toPlainString()
 
     private companion object {
         const val NO_TICK_NOTICE_MS = 8_000L

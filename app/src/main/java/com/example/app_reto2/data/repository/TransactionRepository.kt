@@ -14,6 +14,6 @@ interface TransactionRepository {
     /** Transacciones del usuario [uid] en tiempo real, de la más reciente a la más antigua. */
     fun getUserTransactions(uid: String): Flow<Resource<List<Transaction>>>
 
-    /** Aprueba (ajustando el balance del usuario) o rechaza una transacción PENDING. */
+    /** Aprueba (ajustando balance y portfolio del usuario) o rechaza una transacción PENDING. */
     suspend fun auditTransaction(transaction: Transaction, isApproved: Boolean): Resource<Unit>
 }

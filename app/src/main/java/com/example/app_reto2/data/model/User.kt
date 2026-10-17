@@ -12,5 +12,7 @@ data class User(
     val email: String = "",
     val role: String = UserRole.USER,
     val balance: Double = INITIAL_BALANCE,
-    val kycDocumentUrl: String? = null
+    val kycDocumentUrl: String? = null,
+    /** Unidades que posee el usuario por par operado (clave = `Transaction.currencyPair`, ej. "BTCUSDT"). */
+    val portfolio: Map<String, Double> = emptyMap()
 )
