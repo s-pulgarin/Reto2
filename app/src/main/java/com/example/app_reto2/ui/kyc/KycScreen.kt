@@ -1,6 +1,8 @@
 package com.example.app_reto2.ui.kyc
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,7 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.app_reto2.util.createTempImageUri
 
 @Composable
 fun KycScreen(
@@ -64,19 +68,57 @@ private fun KycContent(
 ) {
     val context = LocalContext.current
     var selectedUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var pendingCameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var cameraError by rememberSaveable { mutableStateOf<String?>(null) }
     val fileName = remember(selectedUri) { selectedUri?.let { context.fileName(it) } }
+
+    val selectAndUpload: (Uri) -> Unit = { uri ->
+        selectedUri = uri
+        cameraError = null
+        onDocumentSelected()
+        onUpload(uri)
+    }
 
     val pickMedia = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        if (uri != null) {
-            selectedUri = uri
-            onDocumentSelected()
+        if (uri != null) selectAndUpload(uri)
+    }
+
+    val takePicture = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingCameraUri
+        pendingCameraUri = null
+        if (success && uri != null) selectAndUpload(uri)
+    }
+
+    val requestCameraPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val uri = pendingCameraUri
+        if (granted && uri != null) {
+            takePicture.launch(uri)
+        } else {
+            pendingCameraUri = null
+            cameraError = "Se necesita permiso de cámara para tomar la foto."
+        }
+    }
+
+    val launchCamera = {
+        val uri = context.createTempImageUri()
+        pendingCameraUri = uri
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            takePicture.launch(uri)
+        } else {
+            requestCameraPermission.launch(Manifest.permission.CAMERA)
         }
     }
 
     val isLoading = state is KycState.Loading
-    val canUpload = selectedUri != null && !isLoading && state !is KycState.Success
 
     Column(
         modifier = modifier
@@ -96,6 +138,14 @@ private fun KycContent(
             textAlign = TextAlign.Center
         )
 
+        Button(
+            onClick = launchCamera,
+            enabled = !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Tomar Foto")
+        }
+
         OutlinedButton(
             onClick = {
                 pickMedia.launch(
@@ -105,7 +155,7 @@ private fun KycContent(
             enabled = !isLoading,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Seleccionar Documento")
+            Text("Subir desde Galería")
         }
 
         if (selectedUri != null) {
@@ -122,12 +172,18 @@ private fun KycContent(
             }
         }
 
-        Button(
-            onClick = { selectedUri?.let(onUpload) },
-            enabled = canUpload,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Subir Documento")
+        val retryUri = selectedUri
+        if (state is KycState.Error && retryUri != null) {
+            Button(
+                onClick = { onUpload(retryUri) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Reintentar subida")
+            }
+        }
+
+        cameraError?.let {
+            Text(text = it, color = MaterialTheme.colorScheme.error)
         }
 
         if (isLoading) {
