@@ -5,6 +5,7 @@ import com.example.app_reto2.data.model.User
 import com.example.app_reto2.data.model.UserRole
 import com.example.app_reto2.util.Resource
 import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -99,11 +100,18 @@ class AuthRepositoryImpl(
         return user
     }
 
+    // FirebaseAuthWeakPasswordException hereda de FirebaseAuthInvalidCredentialsException,
+    // por eso va primero; un correo mal formado también llega como InvalidCredentials.
     private fun Exception.toFriendlyMessage(): String = when (this) {
-        is FirebaseAuthInvalidUserException -> "No existe una cuenta con ese correo."
-        is FirebaseAuthInvalidCredentialsException -> "Correo o contraseña incorrectos."
-        is FirebaseAuthUserCollisionException -> "Ya existe una cuenta con ese correo."
-        is FirebaseAuthWeakPasswordException -> "La contraseña es demasiado débil."
+        is FirebaseAuthWeakPasswordException -> "La contraseña debe tener al menos 6 caracteres."
+        is FirebaseAuthInvalidCredentialsException ->
+            if (errorCode == ERROR_INVALID_EMAIL) "El formato del correo es inválido."
+            else "Correo o contraseña incorrectos."
+        is FirebaseAuthUserCollisionException -> "El correo ya está registrado."
+        is FirebaseAuthInvalidUserException ->
+            if (errorCode == ERROR_USER_DISABLED) "Esta cuenta está deshabilitada."
+            else "No existe una cuenta con ese correo."
+        is FirebaseTooManyRequestsException -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
         is FirebaseNetworkException -> "Sin conexión. Revisa tu internet."
         is FirebaseFirestoreException -> when (code) {
             FirebaseFirestoreException.Code.PERMISSION_DENIED -> "Sin permisos para acceder al perfil."
@@ -115,5 +123,7 @@ class AuthRepositoryImpl(
 
     private companion object {
         const val USERS_COLLECTION = "users"
+        const val ERROR_INVALID_EMAIL = "ERROR_INVALID_EMAIL"
+        const val ERROR_USER_DISABLED = "ERROR_USER_DISABLED"
     }
 }

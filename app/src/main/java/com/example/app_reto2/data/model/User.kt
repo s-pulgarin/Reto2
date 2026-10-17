@@ -1,6 +1,7 @@
 package com.example.app_reto2.data.model
 
-const val INITIAL_BALANCE = 10_000.0
+// Debe coincidir con la regla de creación de users/{uid} en Firestore.
+const val INITIAL_BALANCE = 300_000.0
 
 object UserRole {
     const val USER = "user"

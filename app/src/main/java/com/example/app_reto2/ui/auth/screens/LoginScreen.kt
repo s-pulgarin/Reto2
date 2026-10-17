@@ -21,8 +21,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.app_reto2.R
 import com.example.app_reto2.data.model.User
 import com.example.app_reto2.ui.auth.AuthState
 import com.example.app_reto2.ui.auth.AuthViewModel
@@ -79,7 +81,7 @@ private fun LoginContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "App Reto2",
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary
         )
