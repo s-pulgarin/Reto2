@@ -3,7 +3,7 @@ package com.example.app_reto2.data.repository
 import com.example.app_reto2.data.model.INITIAL_BALANCE
 import com.example.app_reto2.data.model.User
 import com.example.app_reto2.data.model.UserRole
-import com.example.app_reto2.util.AuthResult
+import com.example.app_reto2.util.Resource
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -26,25 +26,25 @@ class AuthRepositoryImpl(
     override val hasSession: Boolean
         get() = firebaseAuth.currentUser != null
 
-    override suspend fun restoreSession(): AuthResult<User> =
+    override suspend fun restoreSession(): Resource<User> =
         try {
             val firebaseUser = firebaseAuth.currentUser
-                ?: return AuthResult.Error("No hay una sesión activa.")
-            AuthResult.Success(fetchOrCreateProfile(firebaseUser))
+                ?: return Resource.Error("No hay una sesión activa.")
+            Resource.Success(fetchOrCreateProfile(firebaseUser))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AuthResult.Error(e.toFriendlyMessage(), e)
+            Resource.Error(e.toFriendlyMessage(), e)
         }
 
-    override suspend fun login(email: String, password: String): AuthResult<User> =
+    override suspend fun login(email: String, password: String): Resource<User> =
         try {
             val firebaseUser = firebaseAuth.signInWithEmailAndPassword(email, password)
                 .await()
                 .user
-                ?: return AuthResult.Error("No se pudo obtener el usuario.")
+                ?: return Resource.Error("No se pudo obtener el usuario.")
             try {
-                AuthResult.Success(fetchOrCreateProfile(firebaseUser))
+                Resource.Success(fetchOrCreateProfile(firebaseUser))
             } catch (e: Exception) {
                 firebaseAuth.signOut() // evita sesión a medias sin rol
                 throw e
@@ -52,17 +52,17 @@ class AuthRepositoryImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AuthResult.Error(e.toFriendlyMessage(), e)
+            Resource.Error(e.toFriendlyMessage(), e)
         }
 
-    override suspend fun register(email: String, password: String): AuthResult<User> =
+    override suspend fun register(email: String, password: String): Resource<User> =
         try {
             val firebaseUser = firebaseAuth.createUserWithEmailAndPassword(email, password)
                 .await()
                 .user
-                ?: return AuthResult.Error("No se pudo crear el usuario.")
+                ?: return Resource.Error("No se pudo crear el usuario.")
             try {
-                AuthResult.Success(createProfile(firebaseUser))
+                Resource.Success(createProfile(firebaseUser))
             } catch (e: Exception) {
                 runCatching { firebaseUser.delete().await() } // rollback de la cuenta
                 throw e
@@ -70,15 +70,15 @@ class AuthRepositoryImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AuthResult.Error(e.toFriendlyMessage(), e)
+            Resource.Error(e.toFriendlyMessage(), e)
         }
 
-    override suspend fun logout(): AuthResult<Unit> =
+    override suspend fun logout(): Resource<Unit> =
         try {
             firebaseAuth.signOut()
-            AuthResult.Success(Unit)
+            Resource.Success(Unit)
         } catch (e: Exception) {
-            AuthResult.Error(e.toFriendlyMessage(), e)
+            Resource.Error(e.toFriendlyMessage(), e)
         }
 
     /** Lee users/{uid}; si no existe (cuentas anteriores a esta fase) lo crea con rol "user". */

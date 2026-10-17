@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_reto2.data.model.User
 import com.example.app_reto2.data.repository.AuthRepository
-import com.example.app_reto2.util.AuthResult
+import com.example.app_reto2.util.Resource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,8 +44,8 @@ class AuthViewModel(
     fun logout() {
         viewModelScope.launch {
             _state.value = when (val result = authRepository.logout()) {
-                is AuthResult.Success -> AuthState.LoggedOut
-                is AuthResult.Error -> AuthState.Error(result.message)
+                is Resource.Success -> AuthState.LoggedOut
+                is Resource.Error -> AuthState.Error(result.message)
             }
         }
     }
@@ -68,8 +68,8 @@ class AuthViewModel(
         return true
     }
 
-    private fun AuthResult<User>.toState(): AuthState = when (this) {
-        is AuthResult.Success -> AuthState.Success(data)
-        is AuthResult.Error -> AuthState.Error(message)
+    private fun Resource<User>.toState(): AuthState = when (this) {
+        is Resource.Success -> AuthState.Success(data)
+        is Resource.Error -> AuthState.Error(message)
     }
 }
